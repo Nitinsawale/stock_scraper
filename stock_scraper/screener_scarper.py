@@ -1,9 +1,9 @@
 from web_scraper.web_scraper import WebScraper
 import re
 import pandas as pd
-
-
-
+import json
+import logging
+logging.basicConfig(level= logging.INFO)
 class ScreenerScraper(WebScraper):
     
     def __init__(self):
@@ -14,11 +14,28 @@ class ScreenerScraper(WebScraper):
             {"id":"cash-flow"}, {"id":"ratios"}, {"id":"shareholding"},
             {"id":"documents"}]
         }
+        self.number_regex = re.compile(r"-*\d+\.*\d*")
 
+
+    def filter_floats(self, string_number):
+        if type(string_number) == dict or not string_number:
+            return string_number 
+        return float("".join(re.findall(self.number_regex,string_number)))
+    
+
+    def format_table_data(self, table_df):
+
+        all_columns = table_df.columns.tolist()[1:]
+        for col in all_columns:
+            table_df[col] = table_df[col].apply(self.filter_floats)
+        return table_df
+    
     def get_company_profile(self, profile_tag):
         
         profile_info_tag = profile_tag['tag_data'][0]
         return {}
+    
+
     
     def get_company_links(self, link_tag):
 
@@ -120,6 +137,8 @@ class ScreenerScraper(WebScraper):
             if "data-result-table"  in tag.get("tag_attributes",{}):
                 table = tag['tag_data'][0]
                 table_df = self.extract_table(table)
+                table_df = self.format_table_data(table_df)
+                logging.info("Quarterly results generated")
                 return table_df.to_dict(orient = "records")
             
 
@@ -129,6 +148,8 @@ class ScreenerScraper(WebScraper):
             if "data-result-table"  in tag.get("tag_attributes",{}):
                 table = tag['tag_data'][0]
                 table_df = self.extract_table(table)
+                table_df = self.format_table_data(table_df)
+                logging.info("profite loss results generated")
                 return table_df.to_dict(orient = "records")
             
 
@@ -138,6 +159,8 @@ class ScreenerScraper(WebScraper):
             if "data-result-table"  in tag.get("tag_attributes",{}):
                 table = tag['tag_data'][0]
                 table_df = self.extract_table(table)
+                table_df = self.format_table_data(table_df)
+                logging.info("balance sheet results generated")
                 return table_df.to_dict(orient = "records")
             
 
@@ -147,6 +170,9 @@ class ScreenerScraper(WebScraper):
             if "data-result-table"  in tag.get("tag_attributes",{}):
                 table = tag['tag_data'][0]
                 table_df = self.extract_table(table)
+                table_df = self.format_table_data(table_df)
+                logging.info("cash flow results generated")
+                print(table_df)
                 return table_df.to_dict(orient = "records")
             
     def get_ratios_table(self, result_tab):
@@ -155,6 +181,10 @@ class ScreenerScraper(WebScraper):
             if "data-result-table"  in tag.get("tag_attributes",{}):
                 table = tag['tag_data'][0]
                 table_df = self.extract_table(table)
+                import pdb;pdb.set_trace()
+                table_df = self.format_table_data(table_df)
+                logging.info("ratio results generated")
+                print(table_df)
                 return table_df.to_dict(orient = "records")
     
     def get_shareholding_table(self, result_tab):
@@ -163,10 +193,14 @@ class ScreenerScraper(WebScraper):
             if tag.get("tag_attributes",{}).get("id", "") == "quarterly-shp" :
                 table = tag['tag_data'][0]['tag_data'][0]
                 table_df = self.extract_table(table)
+                table_df = self.format_table_data(table_df)
+                logging.info("Yearly shareholding results generated")
                 shp['quarterly_shareholding']  = table_df.to_dict(orient = "records")
             elif tag.get("tag_attributes",{}) == "yearly-shp":
                 table = tag['tag_data'][0]['tag_data'][0]
                 table_df = self.extract_table(table)
+                table_df = self.format_table_data(table_df)
+                logging.info("Quarterly shareholding results generated")
                 shp['quarterly_shareholding']  = table_df.to_dict(orient = "records")
         return shp
     
@@ -202,7 +236,8 @@ class ScreenerScraper(WebScraper):
             
         
         all_company_data['peers'] = await self.get_company_peers(all_company_data['data_warehouse_id'])
-
+        with open("sample.json", "w") as fp:
+            fp.write(json.dumps(all_company_data))
         return all_company_data
             
        
