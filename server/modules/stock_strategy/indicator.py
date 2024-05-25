@@ -2,6 +2,10 @@ from abc import ABC
 import pandas as pd
 import pandas_ta as pta
 from numpy import nan
+import logging 
+import numpy as np
+
+logging.basicConfig(level=logging.INFO)
 def decorator_timer(some_function):
     from time import time
 
@@ -9,7 +13,7 @@ def decorator_timer(some_function):
         t1 = time()
         result = some_function(*args, **kwargs)
         end = time()-t1
-        print(end)
+        logging.info(f"{some_function.__name__} took {end} seconds")
         return result
     return wrapper
 
@@ -57,12 +61,49 @@ class AverageTrueRange:
         self.data_df.iloc[:1] = nan
         self.data_df['average_true_range'] =  self.data_df['true_range'].iloc[1:].ewm(alpha = 1 / window,  min_periods = window).mean()
         return self.data_df
+    
+
+class SuperTrend:
+
+    def __init__(self,data_df):
+        self.data_df = data_df
+
+    
+    @decorator_timer
+    def calculate_indicator_values(self, length, multiplier):
+        df =  pta.supertrend(self.data_df['high'], self.data_df['low'], self.data_df['close'],length= length, multiplier = multiplier)
+        col_name = f"SUPERTd_{length}_{multiplier}"
+        self.data_df['super_trend'] = df[col_name]
+        buy_signal = (self.data_df['super_trend'] == 1) & (self.data_df['super_trend'].shift() == -1)
+        sell_signal = (self.data_df['super_trend'] == -1) & (self.data_df['super_trend'].shift() == 1)
+        self.data_df.loc[buy_signal, 'buy/sell signal'] = "BUY"
+        self.data_df.loc[sell_signal, 'buy/sell signal'] = "SELL"
+        return self.data_df
+
+
+
+class MovingAverage:
+
+    def __init__(self,data_df):
+        self.data_df = data_df
+
+    
+    @decorator_timer
+    def smooth_data(self, data, window_size=5):
+        return data.rolling(window=window_size, min_periods=1).mean()
+
+    @decorator_timer
+    def calculate_indicator_values(self, length):
+        # self.data_df['moving_average_1'] = self.data_df['close'].rolling(window = length).mean()
+        self.data_df['moving_average'] = pta.sma(self.data_df['close'], length = length, offset=0)
+        # self.data_df['mvs'] = pta.ssf(self.data_df['moving_average'], length = 5)
+        # self.data_df['smoothed'] = self.smooth_data(self.data_df['close'])
+        return self.data_df
+
+
 
 if __name__ == "__main__":
-   
     data = pd.read_excel("./^NSEI_1d.xlsx")
-    tr = AverageTrueRange(data, '1d')
-    df = tr.calculate_indicator_values(14)
-    df['data_to_test'] = pta.atr(data['high'], data['low'], data['close'], length=14)
-    df.to_excel('test.xlsx', index = False)
-    import pdb;pdb.set_trace()
+    tr = MovingAverage(data, '1d')
+    df = tr.calculate_indicator_values(80)
+    df.to_excel("result.xlsx")

@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import yfinance as yf
 import logging
-from ..constants import CHART_DATA_STORAGE_LOCATION
+from constants import CHART_DATA_STORAGE_LOCATION
 
 logger = logging.basicConfig(level=logging.INFO)
 
@@ -28,7 +28,7 @@ class CandlePriceRetriever:
         columns = {x:x.lower() for x in columns}
         data.rename(columns =columns, inplace=True)
         data['date'] = data['date'].apply(lambda x: pd.to_datetime(x).date())
-        data.to_excel(file_location)
+        data.to_excel(file_location, index = False)
         return data
 
     def fetch_data_from_yahoo_finanance(self,time_period, time_interval):
